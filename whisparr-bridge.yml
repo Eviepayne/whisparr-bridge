@@ -24,9 +24,3 @@ settings:
   MONITORED:
     displayName: Monitor after add (true/false)
     type: STRING
-
-tasks:
-  - name: Self-test
-    description: Emit ok to verify detection
-    defaultArgs: {}
-

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json, sys, urllib.request, urllib.error, os
+import json, sys, urllib.request, urllib.error
 from stashapi.stashapp import StashInterface
 from stashapi import log
 
@@ -45,42 +45,22 @@ def http_post_json(url, body, api_key):
         except Exception:
             return e.code, raw
 
-# ---------- plugin config helpers ----------
-def pick_plugin_config(stash_config: dict, server_conn: dict) -> dict:
-    """Find this plugin's settings dict inside stash_config['plugins']."""
-    plugins = (stash_config or {}).get("plugins") or {}
-    if not plugins:
-        log.error("No plugins section in stash configuration.")
+def load_plugin_settings(stash: StashInterface) -> dict:
+    """Return this plugin's settings using the manifest name."""
+    try:
+        stash_config = stash.get_configuration()
+    except Exception as e:
+        log.error(f"get_configuration failed: {e}")
         return {}
 
-    candidates = []
-    plugdir = (server_conn or {}).get("PluginDir") or ""
-    if plugdir:
-        candidates.append(os.path.basename(plugdir.rstrip("/")))
+    plugins = (stash_config or {}).get("plugins") or {}
+    settingname = "whisparr-bridge"
+    cfg = plugins.get(settingname)
+    if not isinstance(cfg, dict):
+        log.error(f"Plugin settings not found under '{settingname}'.")
+        return {}
 
-    candidates += [
-        "whisparr-bridge",
-        "Whisparr Bridge",
-        "whisparr_bridge",
-        "WhisparrBridge",
-        "whisparrbridge",
-    ]
-
-    for key in candidates:
-        cfg = plugins.get(key)
-        if isinstance(cfg, dict) and cfg:
-            log.info(f"Using plugin config key: {key}")
-            return cfg
-
-    log.info("Available plugin config keys: " + ", ".join(sorted(plugins.keys())))
-    return {}
-
-def read_setting(cfg: dict, snake_name: str, default=None):
-    """Prefer UPPER_SNAKE (manifest), fallback to camelCase."""
-    upper = snake_name.upper()
-    parts = snake_name.split("_")
-    camel = parts[0] + "".join(p.capitalize() for p in parts[1:])
-    return (cfg or {}).get(upper, (cfg or {}).get(camel, default))
+    return cfg
 
 # ---------- main ----------
 def main():
@@ -95,19 +75,14 @@ def main():
     # Stash API client
     stash = StashInterface(STASH_DATA["server_connection"])
 
-    # Load plugin settings from Stash configuration
-    try:
-        stash_config = stash.get_configuration()
-    except Exception as e:
-        log.error(f"get_configuration failed: {e}")
+    plugin_cfg = load_plugin_settings(stash)
+    if not plugin_cfg:
         return
 
-    plugin_cfg = pick_plugin_config(stash_config, STASH_DATA.get("server_connection"))
-
-    whisparr_url = (read_setting(plugin_cfg, "whisparr_url", "") or "").rstrip("/")
-    whisparr_key = read_setting(plugin_cfg, "whisparr_api_key", "") or ""
-    match_substr = read_setting(plugin_cfg, "stashdb_endpoint_substr", "stashdb.org") or "stashdb.org"
-    monitored = str(read_setting(plugin_cfg, "monitored", "false") or "false").lower() == "true"
+    whisparr_url = (plugin_cfg.get("WHISPARR_URL") or "").rstrip("/")
+    whisparr_key = plugin_cfg.get("WHISPARR_API_KEY") or ""
+    match_substr = plugin_cfg.get("STASHDB_ENDPOINT_SUBSTR") or "stashdb.org"
+    monitored = (plugin_cfg.get("MONITORED") or "").strip().lower() == "true"
 
     if not whisparr_url or not whisparr_key:
         log.error("Missing Whisparr settings (URL/API key).")
@@ -175,4 +150,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
