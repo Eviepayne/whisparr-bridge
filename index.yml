@@ -1,9 +1,0 @@
-- id: whisparr-bridge
-  name: Whisparr Bridge
-  metadata:
-    description: Updates Whisparr with matching StashIDs
-  version: 1.0.0
-  date: 2025-11-01 20:27:00
-  path: whisparr-bridge-master.zip
-  sha256: adbcfa36fbc2ec545278e05a3b8757a0c41c7dcc31002635a42568a52e43c16d
-
